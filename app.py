@@ -21,7 +21,12 @@ if not GROQ_KEY:
 from groq import Groq
 from huggingface_hub import InferenceClient
 from fpdf import FPDF
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+    HAS_MPL = True
+except ImportError:
+    HAS_MPL = False
+    plt = None
 
 groq_client = Groq(api_key=GROQ_KEY)
 hf_client = InferenceClient(token=HF_TOKEN) if HF_TOKEN else None
