@@ -49,7 +49,7 @@ st.markdown(f"<style>.reader{{background:{bg};color:{tc};font-size:{font_size}px
 
 def ai(prompt, task="write"):
     sys={"write":"You are expert eBook writer.","grammar":"Fix spelling/grammar only.","improve":"Improve clarity, flow, engagement."}
-    groq_client.chat.completions.create(model="llama-3.1-8b-instant", messages=[{"role":"system","content":sys.get(task,"")},{"role":"user","content":prompt}], temperature=0.7)
+    groq_client.chat.completions.create(model="openai/gpt-oss-20b", messages=[{"role":"system","content":sys.get(task,"")},{"role":"user","content":prompt}], temperature=0.7)
     return r.choices[0].message.content
 
 def ai_image(prompt, save_as="cover.png"):
