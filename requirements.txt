@@ -3,4 +3,5 @@ groq
 huggingface_hub
 fpdf2
 Pillow
+python-docs
 requests
