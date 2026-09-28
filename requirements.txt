@@ -1,6 +1,5 @@
-streamlit==1.39.0
-groq==0.11.0
-huggingface_hub==0.24.7
-fpdf2==2.7.9
-Pillow==11.1.0
-requests==2.32.3
+streamlit
+groq
+fpdf2
+Pillow
+requests
