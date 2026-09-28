@@ -52,9 +52,9 @@ def ai(prompt, task="write"):
     r = groq_client.chat.completions.create(
         model="openai/gpt-oss-20b",
         messages=[
-            {"role": "system", "content": sys},
-            {"role": "user", "content": prompt}
-        ]
+       {"role": "system", "content": sys},
+       {"role": "user", "content": prompt}
+               ]
     )
     return r.choices[0].message.content
 def ai_image(prompt, save_as="cover.png"):
