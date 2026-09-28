@@ -69,7 +69,10 @@ with st.sidebar:
 
 # --- Publishing Add-ons ---
 import random, datetime, re
-from docx import Document
+try:
+    from docx import Document
+except ImportError:
+    Document = None
 
 def generate_ksbn():
     yr=datetime.datetime.now().year
