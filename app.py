@@ -1,141 +1,236 @@
+
+# Standard sizes reference:
+# - Amazon KDP Paperback most popular: 6" x 9" (15.24 x 22.86 cm)
+# - Trade / Brown 5" x 8" (12.7 x 20.32 cm) - compact novel size
+# - 5.5" x 8.5" (13.97 x 21.59 cm)
+# - 8.5" x 11" (21.59 x 27.94 cm) - workbook
+# - A4 (8.27" x 11.69") - PDF guides
 import streamlit as st
-import os, requests
-from io import BytesIO
-
-st.set_page_config(page_title="Koncept AI", page_icon="✨", layout="wide")
-
-# --- Secure secrets handling ---
-def get_secret(name):
-    try:
-        return st.secrets[name]
-    except Exception:
-        return os.getenv(name, "")
-
-GROQ_KEY = get_secret("GROQ_API_KEY")
-HF_TOKEN = get_secret("HF_TOKEN")
-
-if not GROQ_KEY:
-    st.error("Missing GROQ_API_KEY. Add it in Streamlit Secrets. See README.")
-    st.stop()
-
+import os
 from groq import Groq
 from huggingface_hub import InferenceClient
 from fpdf import FPDF
-try:
-    import matplotlib.pyplot as plt
-    HAS_MPL = True
-except ImportError:
-    HAS_MPL = False
-    plt = None
+from PIL import Image
 
-groq_client = Groq(api_key=GROQ_KEY)
-hf_client = InferenceClient(token=HF_TOKEN) if HF_TOKEN else None
+st.set_page_config(page_title="Koncept AI - eBook Studio Pro", layout="wide")
 
-for k in ['text','book','blueprint','has_chart']:
-    if k not in st.session_state: st.session_state[k]=""
+groq_client = Groq(api_key=st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY","")))
+hf_token = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN",""))
+hf_client = InferenceClient(token=hf_token) if hf_token else None
 
-# --- Theme ---
-st.markdown("<style>.stButton>button{background:linear-gradient(90deg,#8E2DE2,#4A00E0);color:white;border-radius:20px;padding:10px 25px;border:none;font-weight:bold;}</style>", unsafe_allow_html=True)
-logo_path = "assets/logo.png"
-header_img = f"<img src='{logo_path}' width='60'>" if os.path.exists(logo_path) else "✨"
-st.markdown(f"""<div style="text-align:center;padding:20px;background:linear-gradient(135deg,#8E2DE2,#4A00E0);border-radius:15px;margin-bottom:15px;"><h1 style="color:white;margin:0;">{header_img} Koncept AI</h1><p style="color:white;">Write, Visualize, Publish - All Free</p></div>""", unsafe_allow_html=True)
+# --- TIERS CONFIG ---
+TIERS = {
+    "Free": {"books":1, "chapters":3, "features":["Basic writer","PDF export"], "price":"Free"},
+    "Pro Std": {"books":10, "chapters":100, "features":["Basic Facilities","Title+Outline","Chapter Writer","PDF"], "price":"₹499"},
+    "Pro Dlx": {"books":30, "chapters":500, "features":["Medium Facilities","All Std + Cover Studio","Image upload","Font controls"], "price":"₹999"},
+    "Pro Max": {"books":100, "chapters":2000, "features":["Highest Facilities","All Dlx + Priority AI","Chatbot support","Commercial license"], "price":"₹1999"},
+}
+RAZORPAY_LINK = st.secrets.get("RAZORPAY_LINK", "https://razorpay.com/your-link")
+PAYPAL_LINK = st.secrets.get("PAYPAL_LINK", "https://paypal.me/yourlink")
 
-# --- Reader comfort ---
-st.sidebar.title("📖 Reader")
-font_size = st.sidebar.slider("Font Size", 12, 22, 16)
-dark_mode = st.sidebar.checkbox("Dark Mode")
-bg = "#1e1e1e" if dark_mode else "#ffffff"; tc = "#fff" if dark_mode else "#000"
-st.markdown(f"<style>.reader{{background:{bg};color:{tc};font-size:{font_size}px;line-height:1.8;padding:20px;border-radius:10px;}}</style>", unsafe_allow_html=True)
+if "tier" not in st.session_state: st.session_state["tier"]="Free"
+if "usage" not in st.session_state: st.session_state["usage"]={"books":0,"chapters":0}
+if "chat_history" not in st.session_state: st.session_state["chat_history"]=[]
 
 def ai(prompt, task="write"):
-    sys = "You are expert eBook writer..."
-    r = groq_client.chat.completions.create(
-        model="openai/gpt-oss-20b",
-        messages=[
-       {"role": "system", "content": sys},
-       {"role": "user", "content": prompt}
-               ]
-    )
+    sys="You are expert eBook writer, write clearly."
+    r=groq_client.chat.completions.create(model="openai/gpt-oss-20b",
+        messages=[{"role":"system","content":sys},{"role":"user","content":prompt}])
     return r.choices[0].message.content
-def ai_image(prompt, save_as="cover.png"):
-    # Try HF first, fallback to Pollinations
-    try:
-        if hf_client:
-            img = hf_client.text_to_image(prompt, model="stabilityai/stable-diffusion-xl-base-1.0")
-            img.save(save_as); return save_as
-    except Exception: pass
-    try:
-        url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?width=800&height=1000&nologo=true"
-        res = requests.get(url, timeout=60); res.raise_for_status()
-        open(save_as,'wb').write(res.content); return save_as
-    except Exception as e:
-        st.warning(f"Image gen failed: {e}"); return None
 
-class PDF(FPDF):
-    def footer(self):
-        self.set_y(-15); self.set_font("Arial","I",8); self.cell(0,10,f"Page {self.page_no()}", align='C')
+def allowed_books():
+    return TIERS[st.session_state["tier"]]["books"]
+def can_create_book():
+    return st.session_state["usage"]["books"] < allowed_books()
 
-tab1,tab2 = st.tabs(["📝 Writer","📚 eBook Studio"])
+# Sidebar - Plan & Recharge
+with st.sidebar:
+    st.header("💎 Your Plan")
+    st.selectbox("Current tier", list(TIERS.keys()), key="tier")
+    t=TIERS[st.session_state["tier"]]
+    st.write(f"**{st.session_state['tier']}** - {t['price']}")
+    st.write(f"Books: {st.session_state['usage']['books']}/{t['books']}")
+    st.write("Features: "+", ".join(t["features"]))
+    st.divider()
+    st.subheader("🔋 Recharge / Upgrade")
+    st.markdown(f"[Pay with Razorpay]({RAZORPAY_LINK})")
+    st.markdown(f"[Pay with PayPal]({PAYPAL_LINK})")
+    st.caption("After payment, enter key given by admin:")
+    key=st.text_input("License key", type="password")
+    if st.button("Activate"):
+        # Simple mapping: key prefix determines tier, set in secrets in production
+        # e.g. STD-XXX, DLX-XXX, MAX-XXX
+        if key.startswith("STD-"): st.session_state["tier"]="Pro Std"; st.success("Pro Std activated")
+        elif key.startswith("DLX-"): st.session_state["tier"]="Pro Dlx"; st.success("Pro Dlx activated")
+        elif key.startswith("MAX-"): st.session_state["tier"]="Pro Max"; st.success("Pro Max activated")
+        else: st.error("Invalid key - contact support")
+        st.rerun()
+
+
+# --- Publishing Add-ons ---
+import random, datetime, re
+from docx import Document
+
+def generate_ksbn():
+    yr=datetime.datetime.now().year
+    rnd=''.join([str(random.randint(0,9)) for _ in range(5)])
+    return f"KSBN-{yr}-{rnd}"
+
+def validate_isbn(isbn):
+    clean=re.sub(r'[^0-9X]','',isbn.upper())
+    return len(clean) in [10,13]
+
+def kdp_checks(plan_text, chapters, has_cover, has_isbn):
+    checks=[]
+    wc=len((plan_text+" ".join(chapters)).split())
+    checks.append(("Word count >= 2500 for KDP" , wc>=2500, f"{wc} words"))
+    checks.append(("Table of Contents present", "##" in plan_text or "Chapter" in plan_text, "TOC check"))
+    checks.append(("At least 3 chapters", len(chapters)>=3, f"{len(chapters)} chapters"))
+    checks.append(("Cover image ready", has_cover, "Cover"))
+    checks.append(("ISBN added", has_isbn, "ISBN"))
+    # Amazon prohibited: no placeholder lorem
+    checks.append(("No lorem ipsum", "lorem" not in (plan_text.lower()), "Clean"))
+    return checks
+
+tab1, tab2, tab3, tab4 = st.tabs(["✍️ Writer","📘 eBook Studio","🤖 AI Assistant","📦 Publish"])
+
 with tab1:
-    t=st.text_input("Topic")
-    if st.button("Generate"):
-        if t:
-            with st.spinner("Writing..."): st.session_state['text']=ai(t)
-    if st.session_state['text']:
-        ed=st.text_area("Edit", st.session_state['text'], height=250)
-        c1,c2,c3,c4=st.columns(4)
-        if c1.button("Fix Grammar"): st.session_state['text']=ai(ed,"grammar"); st.rerun()
-        if c2.button("Improve"): st.session_state['text']=ai(ed,"improve"); st.rerun()
-        if c3.button("Originality Check"):
-            with st.spinner("Checking..."): st.info(ai(f"Flag plagiarism risk and rewrite risky parts originally: {ed}"))
-        if c4.button("Paraphrase"): st.session_state['text']=ai(f"Paraphrase originally: {ed}","improve"); st.rerun()
-        st.markdown(f"<div class='reader'>{st.session_state['text']}</div>", unsafe_allow_html=True)
+    st.subheader("Book Planner")
+    topic=st.text_input("Topic")
+    audience=st.text_input("Audience")
+    goal=st.selectbox("Goal",["Teach","Lead magnet","Sell"])
+    if st.button("Generate Title + Outline"):
+        if not can_create_book():
+            st.error(f"Limit reached for {st.session_state['tier']}. Please recharge/upgrade.")
+        else:
+            with st.spinner("Planning..."):
+                plan=ai(f"Plan ebook on {topic} for {audience}, goal {goal}. Give 3 titles + outline Parts->Chapters.")
+                st.session_state["usage"]["books"]+=1
+                st.session_state["plan"]=plan
+                st.markdown(plan)
+    if "plan" in st.session_state: st.markdown(st.session_state["plan"])
+    st.divider()
+    ch_title=st.text_input("Chapter title")
+    tone=st.selectbox("Tone",["Simple","Friendly","Professional"])
+    if st.button("Write Chapter"):
+        txt=ai(f"Write chapter {ch_title} on {topic}, tone {tone}, with hook, examples, takeaways")
+        st.session_state["usage"]["chapters"]+=1
+        st.markdown(txt)
+        if "chapters" not in st.session_state: st.session_state["chapters"]=[]
+        st.session_state["chapters"].append(txt)
 
 with tab2:
-    title=st.text_input("Book Title", key="btitle")
-    n=st.number_input("Chapters",1,10,3); lang=st.selectbox("Language",["English","Hindi","Bengali"])
-    if st.button("Create eBook"):
-        full=""; prog=st.progress(0)
-        for i in range(int(n)):
-            with st.spinner(f"Chapter {i+1}..."):
-                ch=ai(f"Write chapter {i+1} for '{title}': hook, explanation, examples, takeaways")
-                if lang!="English": ch=ai(f"Translate to {lang}: {ch}")
-                full+=f"\n\nCHAPTER {i+1}\n{ch}"
-            prog.progress((i+1)/int(n))
-        st.session_state['book']=full
-        p=ai_image(f"professional book cover for '{title}'", "cover.png")
-        if p: st.image(p, width=300)
+    st.header("Design & Export")
+    # Feature gating
+    tier=st.session_state["tier"]
+    font=st.selectbox("Font",["Helvetica","Times"])
+    body_size=st.slider("Body size",10,18,12)
+    if tier in ["Pro Dlx","Pro Max"]:
+        cover_prompt=st.text_input("Cover prompt")
+        up_cover=st.file_uploader("Upload cover", type=["png","jpg"])
+        if st.button("Generate Cover") and tier=="Pro Max":
+            st.info("Priority AI cover generation (Pro Max)")
+    else:
+        st.info("Cover Studio available in Pro Dlx and above. Upgrade to unlock.")
+    st.subheader("📐 Page Size")
+    size_opt = st.selectbox("Select trim size", [
+        "Amazon KDP - 6x9 inch (15.24 x 22.86 cm) - Most Popular",
+        "Brown / Trade - 5x8 inch (12.7 x 20.32 cm)",
+        "KDP - 5.5x8.5 inch (13.97 x 21.59 cm)",
+        "KDP Large - 8.5x11 inch (21.59 x 27.94 cm)",
+        "A4 - 8.27x11.69 inch (21 x 29.7 cm)"
+    ])
+    # map to FPDF: use custom size in mm
+    size_map = {
+        "Amazon KDP - 6x9 inch (15.24 x 22.86 cm) - Most Popular": (152.4, 228.6),
+        "Brown / Trade - 5x8 inch (12.7 x 20.32 cm)": (127, 203.2),
+        "KDP - 5.5x8.5 inch (13.97 x 21.59 cm)": (139.7, 215.9),
+        "KDP Large - 8.5x11 inch (21.59 x 27.94 cm)": (215.9, 279.4),
+        "A4 - 8.27x11.69 inch (21 x 29.7 cm)": (210, 297),
+    }
+    pw, ph = size_map[size_opt]
+    st.caption(f"Selected: {size_opt} | {pw} x {ph} mm")
+    if st.button("Export PDF"):
 
-    st.subheader("📊 Chart")
-    ct=st.selectbox("Type",["Bar","Pie","Line"]); la=st.text_input("Labels","A,B,C"); va=st.text_input("Values","10,20,30")
-    if st.button("Make Chart"):
-        try:
-            L=[x.strip() for x in la.split(",")]; V=[float(x.strip()) for x in va.split(",")]
-            plt.figure(figsize=(6,4))
-            if ct=="Bar": plt.bar(L,V,color='#8E2DE2')
-            elif ct=="Pie": plt.pie(V,labels=L,autopct='%1.1f%%')
-            else: plt.plot(L,V,marker='o')
-            plt.tight_layout(); plt.savefig("chart.png"); plt.close(); st.image("chart.png"); st.session_state['has_chart']=True
-        except Exception as e: st.error(e)
+        pdf=FPDF(unit='mm', format=(pw, ph)); pdf.add_page(); pdf.set_font(font,'',body_size)
+        txt=st.session_state.get("plan","")[:5000]
+        for line in txt.split("\n"):
+            pdf.multi_cell(0,8,line.encode('latin-1','replace').decode('latin-1'))
+        pdf.output("book.pdf")
+        with open("book.pdf","rb") as f: st.download_button("Download",f,"book.pdf")
 
-    if st.session_state['book']:
-        st.markdown(f"<div class='reader'>{st.session_state['book'][:3000]}</div>", unsafe_allow_html=True)
-        if st.button("Export PDF"):
-            pdf=PDF(); pdf.set_auto_page_break(True,15)
-            pdf.add_page(); pdf.set_font("Arial","B",20); pdf.cell(0,10,title.encode('latin-1','replace').decode('latin-1'),ln=True,align='C')
-            if os.path.exists("cover.png"): pdf.image("cover.png",w=150)
-            # TOC
-            pdf.add_page(); pdf.set_font("Arial","B",16); pdf.cell(0,10,"Table of Contents",ln=True)
-            pdf.set_font("Arial","",12)
-            for i in range(int(n)): pdf.cell(0,10,f"Chapter {i+1}",ln=True)
-            # Content - note: non-latin scripts will show as ? in PDF, preview preserves unicode
-            pdf.add_page(); pdf.set_font("Arial","",max(10,font_size-4))
-            clean=st.session_state['book'].encode('latin-1','replace').decode('latin-1')
-            pdf.multi_cell(0,10,clean)
-            if st.session_state.get('has_chart') and os.path.exists("chart.png"):
-                pdf.add_page(); pdf.set_font("Arial","B",14); pdf.cell(0,10,"Chart",ln=True); pdf.image("chart.png",w=170)
-            pdf.add_page(); pdf.set_font("Arial","I",10)
-            pdf.multi_cell(0,10,"Copyright (c) 2026 Koncept AI. AI-generated text and images. Review for originality before commercial use.")
-            if lang!="English": pdf.multi_cell(0,10,"Note: PDF uses Latin encoding. For Hindi/Bengali full script, use DOCX export or web preview.")
-            pdf.output("koncept_ebook.pdf")
-            with open("koncept_ebook.pdf","rb") as f: st.download_button("📥 Download PDF",f,"koncept_ebook.pdf")
+with tab3:
+    st.header("🤖 Koncept AI Assistant")
+    st.write("Ask about pricing, features, or how to use the app.")
+    q=st.text_input("Ask me...")
+    if q:
+        # Simple rule-based + AI fallback
+        if "price" in q.lower() or "pro" in q.lower():
+            ans="Tiers: Free (1 book free). Pro Std ₹499 (up to 10 books, basic). Pro Dlx ₹999 (up to 30 books, medium). Pro Max ₹1999 (up to 100 books, highest). Recharge via Razorpay/PayPal links in sidebar."
+        else:
+            ans=ai(f"You are Koncept AI support chatbot. Answer briefly: {q}")
+        st.session_state["chat_history"].append((q,ans))
+    for qq,aa in reversed(st.session_state["chat_history"]):
+        st.markdown(f"**You:** {qq}")
+        st.markdown(f"**AI:** {aa}")
+
+with tab4:
+    st.header("📦 Publishing, ISBN & Amazon KDP")
+    col1,col2=st.columns(2)
+    with col1:
+        isbn=st.text_input("ISBN-13 (if you have one)", placeholder="978-...")
+        if isbn:
+            if validate_isbn(isbn): st.success("Valid ISBN format")
+            else: st.error("Invalid ISBN - should be 10 or 13 digits")
+        if "ksbn" not in st.session_state: st.session_state["ksbn"]=generate_ksbn()
+        st.text_input("KSBN - Koncept Standard Book Number", value=st.session_state["ksbn"], disabled=True)
+        if st.button("Regenerate KSBN"):
+            st.session_state["ksbn"]=generate_ksbn(); st.rerun()
+    with col2:
+        st.subheader("SEO-friendly metadata")
+        if st.button("Generate SEO Pack"):
+            topic_seo=st.session_state.get("plan","")[:200]
+            seo=ai(f"Generate SEO pack for ebook. Give: 1) SEO title <60 chars, 2) Amazon description 150 words with keywords, 3) 7 backend keywords, 4) categories. Context: {topic_seo}")
+            st.session_state["seo"]=seo
+        if "seo" in st.session_state: st.markdown(st.session_state["seo"])
+
+    st.divider()
+    st.subheader("✅ Amazon KDP Protocol Check")
+    has_cover = True  # simplified, set true if cover generated
+    has_isbn = bool(isbn and validate_isbn(isbn))
+    plan_text=st.session_state.get("plan","")
+    chapters=st.session_state.get("chapters",[])
+    for name, passed, detail in kdp_checks(plan_text, chapters, has_cover, has_isbn):
+        st.markdown(f"{'✅' if passed else '❌'} **{name}** - {detail}")
+    st.caption("KDP requires original content, no trademarked terms in title, proper TOC, and print-ready PDF 6x9\". Ensure you own rights to cover images.")
+
+    st.divider()
+    st.subheader("💾 Export in other formats")
+    fmt=st.selectbox("Format", ["PDF","DOCX","EPUB (basic)","HTML","TXT"])
+    if st.button("Export "+fmt):
+        full_text=st.session_state.get("plan","")+"\\n\\n"+"\\n\\n".join(chapters)
+        meta=f"Title: eBook\\nISBN: {isbn}\\nKSBN: {st.session_state['ksbn']}\\n\\n"
+        if fmt=="TXT":
+            open("book.txt","w",encoding="utf-8").write(meta+full_text)
+            with open("book.txt","rb") as f: st.download_button("Download TXT",f,"book.txt")
+        elif fmt=="HTML":
+            html=f"<html><head><meta charset='utf-8'><title>eBook</title></head><body><p>ISBN:{isbn}<br>KSBN:{st.session_state['ksbn']}</p><pre>{full_text}</pre></body></html>"
+            open("book.html","w",encoding="utf-8").write(html)
+            with open("book.html","rb") as f: st.download_button("Download HTML",f,"book.html")
+        elif fmt=="DOCX":
+            doc=Document(); doc.add_heading('eBook',0)
+            doc.add_paragraph(f"ISBN: {isbn} | KSBN: {st.session_state['ksbn']}")
+            for para in full_text.split("\\n"): doc.add_paragraph(para)
+            doc.save("book.docx")
+            with open("book.docx","rb") as f: st.download_button("Download DOCX",f,"book.docx")
+        elif fmt.startswith("EPUB"):
+            # minimal EPUB
+            import zipfile
+            with zipfile.ZipFile("book.epub","w") as z:
+                z.writestr("mimetype","application/epub+zip")
+                z.writestr("OEBPS/content.opf",f"<package><metadata><dc:title xmlns:dc='http://purl.org/dc/elements/1.1/'>eBook</dc:title><dc:identifier>ISBN:{isbn}</dc:identifier></metadata></package>")
+                z.writestr("OEBPS/ch1.xhtml",f"<html><body><p>ISBN:{isbn} KSBN:{st.session_state['ksbn']}</p><pre>{full_text[:10000]}</pre></body></html>")
+            with open("book.epub","rb") as f: st.download_button("Download EPUB",f,"book.epub")
+        else:
+            st.info("Use eBook Studio tab for PDF")
+
