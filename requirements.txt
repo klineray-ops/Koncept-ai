@@ -1,7 +1,7 @@
-streamlit==1.39.0
+[11:01 pm, 28/9/2026] Koncept: streamlit==1.39.0
 groq==0.11.0
 huggingface_hub==0.24.7
 fpdf2==2.7.9
-matplotlib==3.9.2
-Pillow==10.4.0
+matplotlib==3.9.4
+Pillow==11.1.0
 requests==2.32.3
