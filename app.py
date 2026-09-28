@@ -48,10 +48,15 @@ bg = "#1e1e1e" if dark_mode else "#ffffff"; tc = "#fff" if dark_mode else "#000"
 st.markdown(f"<style>.reader{{background:{bg};color:{tc};font-size:{font_size}px;line-height:1.8;padding:20px;border-radius:10px;}}</style>", unsafe_allow_html=True)
 
 def ai(prompt, task="write"):
-    sys={"write":"You are expert eBook writer.","grammar":"Fix spelling/grammar only.","improve":"Improve clarity, flow, engagement."}
-    groq_client.chat.completions.create(model="openai/gpt-oss-20b", messages=[{"role":"system","content":sys.get(task,"")},{"role":"user","content":prompt}], temperature=0.7)
+    sys = "You are expert eBook writer..."
+    r = groq_client.chat.completions.create(
+        model="openai/gpt-oss-20b",
+        messages=[
+            {"role": "system", "content": sys},
+            {"role": "user", "content": prompt}
+        ]
+    )
     return r.choices[0].message.content
-
 def ai_image(prompt, save_as="cover.png"):
     # Try HF first, fallback to Pollinations
     try:
