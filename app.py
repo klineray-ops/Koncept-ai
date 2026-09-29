@@ -43,12 +43,12 @@ section[data-testid="stSidebar"] .stTextInput>div>div>input {color:#111111 !impo
 import base64
 def _logo_html():
     try:
-        with open("logo.png","rb") as f:
+        with open("koncept_book_logo.png","rb") as f:
             b64 = base64.b64encode(f.read()).decode()
-        return f"<img src='data:image/png;base64,{b64}' style='width:120px;height:120px;object-fit:contain;'/>"
+        return f"<img src='data:image/png;base64,{b64}' style='width:min(340px,80vw);height:auto;object-fit:contain;filter:drop-shadow(0 10px 30px rgba(139,92,246,0.45));'/>"
     except:
         return "<div style='font-size:64px'>📚</div>"
-st.markdown(f"<div style='text-align:center;padding:1rem'>{_logo_html()}<div style='font-size:4.5rem;color:#fbbf24;font-weight:800;letter-spacing:14px;margin-top:0.5rem;'>AI STUDIO</div><p style='color:#cbd5e1;font-size:1.3rem;font-weight:600;margin-top:0.5rem;'>Concept, Write, Design, Publish, Earn<br/>Through BrOwn, KDP, Google, eBookSelf</p></div>", unsafe_allow_html=True)
+st.markdown(f"<div style='text-align:center;padding:1.5rem 1rem 0.5rem'>{_logo_html()}<p style='color:#cbd5e1;font-size:1.3rem;font-weight:600;margin-top:1rem;'>Concept, Write, Design, Publish, Earn<br/>Through BrOwn, KDP, Google, eBookSelf</p></div>", unsafe_allow_html=True)
 
 TIERS = {
     "Free": {"books":3,"chapters":9,"price":0,"price_label":"$0"},
@@ -171,7 +171,7 @@ def _kobot_log_to_sheet(entry):
 _kobot_icon_b64 = ""
 try:
     import base64 as _b64
-    with open("kobot_icon.png","rb") as _f: _kobot_icon_b64 = _b64.b64encode(_f.read()).decode()
+    with open("kobot_icon_cat.png","rb") as _f: _kobot_icon_b64 = _b64.b64encode(_f.read()).decode()
 except: pass
 if _kobot_icon_b64:
     st.markdown(f"""<style>
