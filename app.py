@@ -1,6 +1,6 @@
 
 import streamlit as st
-st.set_page_config(page_title="Koncept AI - Premium eBook Studio", page_icon="📚", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Koncept AI - Premium eBook Studio", page_icon="📚", layout="centered", initial_sidebar_state="collapsed")
 import os, hashlib, traceback
 
 # --- Fast helpers ---
@@ -50,6 +50,15 @@ section[data-testid="stSidebar"] .stTextInput>div>div>input {color:#111111 !impo
 .stCaption, small {color:#e2e8f0 !important;font-size:14px !important;}
 /* Radio and checkbox labels */
 div[data-testid="stRadio"] label, div[data-testid="stCheckbox"] label {color:#ffffff !important;}
+/* --- Mobile fixes --- */
+@media (max-width: 768px) {
+  h1 {font-size:2rem !important;}
+  .stApp p, .stApp div, .stApp label, .stApp span {font-size:15px !important;}
+  button[data-baseweb="tab"] {font-size:13px !important;padding:8px 6px !important;white-space:nowrap;}
+  div[data-testid="stTabs"] {overflow-x:auto;}
+  .stButton>button {padding:.6rem 1rem !important;font-size:15px !important;}
+  img {max-width:100% !important;height:auto !important;}
+}
 </style>''', unsafe_allow_html=True)
 import base64
 def _logo_html():
@@ -59,7 +68,7 @@ def _logo_html():
         return f"<img src='data:image/png;base64,{b64}' style='width:110px;height:110px;object-fit:contain;filter:drop-shadow(0 8px 24px rgba(139,92,246,0.5));'/>"
     except:
         return "<div style='font-size:64px'>📚</div>"
-st.markdown(f"<div style='text-align:center;padding:1.5rem 1rem 0.5rem'>{_logo_html()}<h1 style='margin:0.5rem 0;color:#ffffff !important;font-size:3rem;font-weight:800;'>Koncept AI</h1><p style='color:#ffffff !important;font-size:1.2rem;font-weight:500;'>Concept to Publish, KDP, BrOwn, eBookSelf...</p></div>", unsafe_allow_html=True)
+st.markdown(f"<div style='text-align:center;padding:1.5rem 1rem 0.5rem'>{_logo_html()}<h1 class='mobile-h1' style='margin:0.5rem 0;color:#ffffff !important;font-size:3rem;font-weight:800;'>Koncept AI</h1><p style='color:#ffffff !important;font-size:1.2rem;font-weight:500;'>Concept to Publish, KDP, BrOwn, eBookSelf...</p></div>", unsafe_allow_html=True)
 
 TIERS = {
     "Free": {"books":3,"chapters":9,"price":0,"price_label":"$0"},
@@ -152,7 +161,7 @@ with st.sidebar:
             st.rerun()
 
 # Main workflow tabs - 6 stages
-tab1,tab2,tab3,tab4,tab5,tab6 = st.tabs(["✍️ 1.Writer","🔍 2.Checker","🎨 3.Designer","✨ 4.Finishing","📦 5.Exports","⬇️ 6.Downloads"])
+tab1,tab2,tab3,tab4,tab5,tab6 = st.tabs(["✍️ Writer","🔍 Checker","🎨 Design","✨ Finish","📦 Export","⬇️ Get"])
 
 with tab1:
     st.markdown("### ✍️ Writer - Generate your eBook")
