@@ -69,10 +69,7 @@ with st.sidebar:
 
 # --- Publishing Add-ons ---
 import random, datetime, re
-try:
-    from docx import Document
-except ImportError:
-    Document = None
+from docx import Document
 
 def generate_ksbn():
     yr=datetime.datetime.now().year
@@ -102,7 +99,7 @@ with tab1:
     topic=st.text_input("Topic")
     audience=st.text_input("Audience")
     goal=st.selectbox("Goal",["Teach","Lead magnet","Sell"])
-    if st.button("Generate Title + Outline"):
+    if st.button("Generate Title + Outline", key="gen_outline"):
         if not can_create_book():
             st.error(f"Limit reached for {st.session_state['tier']}. Please recharge/upgrade.")
         else:
@@ -115,7 +112,7 @@ with tab1:
     st.divider()
     ch_title=st.text_input("Chapter title")
     tone=st.selectbox("Tone",["Simple","Friendly","Professional"])
-    if st.button("Write Chapter"):
+    if st.button("Write Chapter", key="write_chap"):
         txt=ai(f"Write chapter {ch_title} on {topic}, tone {tone}, with hook, examples, takeaways")
         st.session_state["usage"]["chapters"]+=1
         st.markdown(txt)
@@ -153,7 +150,7 @@ with tab2:
     }
     pw, ph = size_map[size_opt]
     st.caption(f"Selected: {size_opt} | {pw} x {ph} mm")
-    if st.button("Export PDF"):
+    if st.button("Export PDF", key="export_pdf_studio"):
 
         pdf=FPDF(unit='mm', format=(pw, ph)); pdf.add_page(); pdf.set_font(font,'',body_size)
         txt=st.session_state.get("plan","")[:5000]
@@ -187,11 +184,11 @@ with tab4:
             else: st.error("Invalid ISBN - should be 10 or 13 digits")
         if "ksbn" not in st.session_state: st.session_state["ksbn"]=generate_ksbn()
         st.text_input("KSBN - Koncept Standard Book Number", value=st.session_state["ksbn"], disabled=True)
-        if st.button("Regenerate KSBN"):
+        if st.button("Regenerate KSBN", key="regen_ksbn"):
             st.session_state["ksbn"]=generate_ksbn(); st.rerun()
     with col2:
         st.subheader("SEO-friendly metadata")
-        if st.button("Generate SEO Pack"):
+        if st.button("Generate SEO Pack", key="gen_seo"):
             topic_seo=st.session_state.get("plan","")[:200]
             seo=ai(f"Generate SEO pack for ebook. Give: 1) SEO title <60 chars, 2) Amazon description 150 words with keywords, 3) 7 backend keywords, 4) categories. Context: {topic_seo}")
             st.session_state["seo"]=seo
@@ -210,7 +207,7 @@ with tab4:
     st.divider()
     st.subheader("💾 Export in other formats")
     fmt=st.selectbox("Format", ["PDF","DOCX","EPUB (basic)","HTML","TXT"])
-    if st.button("Export "+fmt):
+    if st.button("Export "+fmt, key="export_publish_btn"):
         full_text=st.session_state.get("plan","")+"\\n\\n"+"\\n\\n".join(chapters)
         meta=f"Title: eBook\\nISBN: {isbn}\\nKSBN: {st.session_state['ksbn']}\\n\\n"
         if fmt=="TXT":
