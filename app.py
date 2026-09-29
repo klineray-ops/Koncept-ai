@@ -116,7 +116,7 @@ with tab1:
         if not client: st.error("Add GROQ_API_KEY in Secrets"); st.stop()
         with st.spinner("Writing... (AI loading on demand)"):
             try:
-                r=client.chat.completions.create(model="llama-3.3-70b-versatile",messages=[{"role":"user","content":f"Write chapter outline for '{title}': {prompt}"}],max_tokens=800)
+                r=client.chat.completions.create(model="llama-3.1-8b-instant",messages=[{"role":"user","content":f"Write chapter outline for '{title}': {prompt}"}],max_tokens=800)
                 out=r.choices[0].message.content
                 st.session_state["last_book"]=out
                 st.success("Done!"); st.write(out)
