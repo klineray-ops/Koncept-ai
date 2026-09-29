@@ -29,7 +29,15 @@ def _hash(pw): return hashlib.sha256(str(pw).encode()).hexdigest()
 
 # --- UI ---
 st.markdown("<style>.stApp{background:linear-gradient(180deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%)}.stButton>button{background:linear-gradient(90deg,#8b5cf6,#ec4899)!important;color:white!important;border:none!important;border-radius:12px!important;padding:.7rem 1.8rem!important;font-weight:600!important}</style>", unsafe_allow_html=True)
-st.markdown("<div style='text-align:center;padding:2rem'><h1>📚 Koncept AI</h1><p style='color:#cbd5e1'>Concept to Publish, KDP, BrOwn, eBookSelf...</p></div>", unsafe_allow_html=True)
+import base64
+def _logo_html():
+    try:
+        with open("logo.png","rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        return f"<img src='data:image/png;base64,{b64}' style='width:110px;height:110px;object-fit:contain;filter:drop-shadow(0 8px 24px rgba(139,92,246,0.5));'/>"
+    except:
+        return "<div style='font-size:64px'>📚</div>"
+st.markdown(f"<div style='text-align:center;padding:1.5rem 1rem 0.5rem'>{_logo_html()}<h1 style='margin:0.5rem 0;background:linear-gradient(90deg,#8b5cf6,#ec4899,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:3rem;font-weight:800;'>Koncept AI</h1><p style='color:#cbd5e1;font-size:1.1rem;'>Concept to Publish, KDP, BrOwn, eBookSelf...</p></div>", unsafe_allow_html=True)
 
 TIERS = {
     "Free": {"books":1,"chapters":3,"price":0,"price_label":"$0"},
