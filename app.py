@@ -48,7 +48,7 @@ def _logo_html():
         return f"<img src='data:image/png;base64,{b64}' style='width:120px;height:120px;object-fit:contain;'/>"
     except:
         return "<div style='font-size:64px'>📚</div>"
-st.markdown(f"<div style='text-align:center;padding:1rem'>{_logo_html()}<div class='brand-title'>KONCEPT</div><div style='font-size:4.5rem;color:#fbbf24;font-weight:800;letter-spacing:14px;margin-top:-1rem;'>AI STUDIO</div><p style='color:#cbd5e1;font-size:1.3rem;font-weight:600;margin-top:0.5rem;'>Concept, Write, Design, Publish, Earn<br/>Through BrOwn, KDP, Google, eBookSelf</p></div>", unsafe_allow_html=True)
+st.markdown(f"<div style='text-align:center;padding:1rem'>{_logo_html()}<div style='font-size:4.5rem;color:#fbbf24;font-weight:800;letter-spacing:14px;margin-top:0.5rem;'>AI STUDIO</div><p style='color:#cbd5e1;font-size:1.3rem;font-weight:600;margin-top:0.5rem;'>Concept, Write, Design, Publish, Earn<br/>Through BrOwn, KDP, Google, eBookSelf</p></div>", unsafe_allow_html=True)
 
 TIERS = {
     "Free": {"books":3,"chapters":9,"price":0,"price_label":"$0"},
@@ -150,29 +150,115 @@ with st.sidebar:
             nt=c2.selectbox("Tier",list(TIERS.keys()),index=list(TIERS.keys()).index(u["tier"]),key=f"t_{email}")
             if nt!=u["tier"]: st.session_state["users"][email]["tier"]=nt; st.rerun()
 
-# ============ AI HELP CHATBOT ============
-with st.expander("🤖 AI Help Assistant — ask anything about Koncept AI"):
-    for m in st.session_state["chat_hist"]:
-        st.write(f"**{'You' if m['r']=='user' else '🤖 AI'}:** {m['t']}")
-    q=st.text_input("Ask a question...",key="ai_q")
-    if st.button("Send"):
-        if q.strip():
-            st.session_state["chat_hist"].append({"r":"user","t":q})
-            client=get_groq()
-            if client:
-                try:
-                    r=client.chat.completions.create(model="llama-3.1-8b-instant",messages=[{"role":"system","content":"You are a helpful assistant for Koncept AI eBook Studio. Help users with plans, workflow, exports."},{"role":"user","content":q}],max_tokens=500)
-                    ans=r.choices[0].message.content
-                except Exception as e: ans=f"AI error: {e}"
-            else:
-                # offline FAQ fallback
-                ql=q.lower()
-                if "price" in ql or "plan" in ql: ans="Plans: Free (3 books $0), Pro Std (10 books $3.99/mo), Pro Dlx (30 books $5.99/mo), Pro Max (99 books $9.99/mo)."
-                elif "pdf" in ql: ans="Go to 5.Exports → Build PDF, then 6.Downloads → Download PDF."
-                elif "manual" in ql: ans="Click 📖 Open User Manual in the sidebar for the full guide."
-                else: ans="I can help with plans, writer, exports, downloads. Ask me anything!"
-            st.session_state["chat_hist"].append({"r":"ai","t":ans})
-            st.rerun()
+# ============ KOBOT CHATBOT ============
+SUPPORT_EMAIL = "klineray@gmail.com"
+if "kobot_open" not in st.session_state: st.session_state["kobot_open"]=False
+if "kobot_step" not in st.session_state: st.session_state["kobot_step"]="greet"
+if "kobot_profile" not in st.session_state: st.session_state["kobot_profile"]={}
+if "kobot_hist" not in st.session_state: st.session_state["kobot_hist"]=[]
+
+def _kobot_log_to_sheet(entry):
+    """Append chat/support entry to Google Sheet if configured, always mailto fallback."""
+    try:
+        import json, urllib.request
+        url = _safe_env("KOBOT_SHEET_WEBHOOK")
+        if url:
+            req = urllib.request.Request(url, data=json.dumps(entry).encode(), headers={"Content-Type":"application/json"})
+            urllib.request.urlopen(req, timeout=5)
+    except: pass
+
+# Floating Kobot button
+_kobot_icon_b64 = ""
+try:
+    import base64 as _b64
+    with open("kobot_icon.png","rb") as _f: _kobot_icon_b64 = _b64.b64encode(_f.read()).decode()
+except: pass
+if _kobot_icon_b64:
+    st.markdown(f"""<style>
+    #kobot-fab {{position:fixed;bottom:24px;right:24px;z-index:9999;cursor:pointer;}}
+    #kobot-fab img {{width:64px;height:64px;border-radius:50%;box-shadow:0 4px 16px rgba(139,92,246,.6);border:3px solid #8b5cf6;}}
+    </style>""", unsafe_allow_html=True)
+
+kcol1, kcol2 = st.columns([9,1])
+with kcol2:
+    if _kobot_icon_b64:
+        import base64 as _b64m
+        st.markdown(f"<img src='data:image/png;base64,{_kobot_icon_b64}' style='width:56px;height:56px;border-radius:50%;'/>", unsafe_allow_html=True)
+    if st.button("💬 Kobot", key="kobot_toggle", use_container_width=True):
+        st.session_state["kobot_open"] = not st.session_state["kobot_open"]
+        if st.session_state["kobot_open"] and st.session_state["kobot_step"]=="greet":
+            st.session_state["kobot_hist"].append({"r":"bot","t":"Hi, I am Kobot, how can I help you? 😊 Please tell me your details so I can assist you better."})
+            st.session_state["kobot_step"]="collect_name"
+
+if st.session_state.get("kobot_open"):
+    with st.expander("🤖 Kobot — your Koncept AI assistant", expanded=True):
+        if _kobot_icon_b64:
+            st.markdown(f"<img src='data:image/png;base64,{_kobot_icon_b64}' style='width:48px;height:48px;border-radius:50%;'/>", unsafe_allow_html=True)
+        for m in st.session_state["kobot_hist"]:
+            who = "🧑 You" if m["r"]=="user" else "🤖 Kobot"
+            st.write(f"**{who}:** {m['t']}")
+        step = st.session_state["kobot_step"]
+        prof = st.session_state["kobot_profile"]
+        if step == "collect_name":
+            nm = st.text_input("Your name", key="kb_name")
+            if st.button("Next →", key="kb_n1"):
+                if nm.strip():
+                    prof["name"]=nm.strip(); st.session_state["kobot_step"]="collect_email"
+                    st.session_state["kobot_hist"].append({"r":"user","t":nm.strip()})
+                    st.session_state["kobot_hist"].append({"r":"bot","t":f"Nice to meet you, {nm.strip()}! What is your email id?"})
+                    st.rerun()
+        elif step == "collect_email":
+            ema = st.text_input("Your email id", key="kb_email")
+            if st.button("Next →", key="kb_n2"):
+                if ema.strip():
+                    prof["email"]=ema.strip(); st.session_state["kobot_step"]="collect_purpose"
+                    st.session_state["kobot_hist"].append({"r":"user","t":ema.strip()})
+                    st.session_state["kobot_hist"].append({"r":"bot","t":"What is the purpose of your visit? (e.g. create ebook, support, pricing)"})
+                    st.rerun()
+        elif step == "collect_purpose":
+            pur = st.text_input("Purpose", key="kb_purpose")
+            if st.button("Next →", key="kb_n3"):
+                if pur.strip():
+                    prof["purpose"]=pur.strip(); st.session_state["kobot_step"]="collect_place"
+                    st.session_state["kobot_hist"].append({"r":"user","t":pur.strip()})
+                    st.session_state["kobot_hist"].append({"r":"bot","t":"Which place / city are you from?"})
+                    st.rerun()
+        elif step == "collect_place":
+            plc = st.text_input("Your place / city", key="kb_place")
+            if st.button("Start Chatting 💬", key="kb_n4"):
+                if plc.strip():
+                    prof["place"]=plc.strip()
+                    st.session_state["kobot_step"]="chat"
+                    st.session_state["kobot_hist"].append({"r":"user","t":plc.strip()})
+                    st.session_state["kobot_hist"].append({"r":"bot","t":f"Thanks {prof.get('name','friend')}! You can now chat freely. All our conversations will be sent to our support team ({SUPPORT_EMAIL}). How can I help?"})
+                    _kobot_log_to_sheet({"type":"new_lead","profile":prof,"time":str(datetime.datetime.now())})
+                    st.rerun()
+        elif step == "chat":
+            q = st.text_input("Type your message...", key="kb_q")
+            if st.button("Send 📩", key="kb_send"):
+                if q.strip():
+                    st.session_state["kobot_hist"].append({"r":"user","t":q})
+                    client=get_groq()
+                    if client:
+                        try:
+                            r=client.chat.completions.create(model="llama-3.1-8b-instant",messages=[{"role":"system","content":"You are Kobot, friendly assistant for Koncept AI eBook Studio."},{"role":"user","content":q}],max_tokens=500)
+                            ans=r.choices[0].message.content
+                        except Exception as e: ans=f"Sorry, AI is busy: {e}"
+                    else:
+                        ql=q.lower()
+                        if "price" in ql or "plan" in ql: ans="Plans: Free (3 books $0), Pro Std (10 books $3.99/mo), Pro Dlx (30 books $5.99/mo), Pro Max (99 books $9.99/mo)."
+                        elif "pdf" in ql: ans="Go to Export tab → Build PDF, then Get tab → Download PDF."
+                        elif "support" in ql or "ticket" in ql: ans=f"Please raise a support ticket in the sidebar, or email us at {SUPPORT_EMAIL}."
+                        else: ans="Thanks for your message! Our team will follow up. Meanwhile ask me about plans, writer, exports."
+                    st.session_state["kobot_hist"].append({"r":"bot","t":ans})
+                    _kobot_log_to_sheet({"type":"chat","profile":prof,"q":q,"a":ans,"time":str(datetime.datetime.now())})
+                    st.rerun()
+            st.markdown("---")
+            _mailto_body = f"Hi Support, I am {prof.get('name','')} ({prof.get('email','')}) from {prof.get('place','')}. Purpose: {prof.get('purpose','')}"
+            import urllib.parse as _up
+            _mailto = f"mailto:{SUPPORT_EMAIL}?subject="+_up.quote("Kobot chat transcript request")+ "&body="+_up.quote(_mailto_body)
+            st.markdown(f"📧 Need human help? [Email us at {SUPPORT_EMAIL}]({_mailto})")
+            st.caption("All chats & support requests are logged and directed to klineray@gmail.com + Google Sheet (set KOBOT_SHEET_WEBHOOK secret for auto-logging).")
 
 # ============ MAIN 6 TABS ============
 tab1,tab2,tab3,tab4,tab5,tab6=st.tabs(["✍️ Writer","🔍 Checker","🎨 Design","✨ Finish","📦 Export","⬇️ Get"])
