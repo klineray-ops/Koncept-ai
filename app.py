@@ -129,14 +129,16 @@ with st.sidebar:
         sl=_safe_env("STRIPE_LINK") or "https://buy.stripe.com/your-link"
         st.link_button(f"Upgrade {cfg['price_label']}",sl)
 
-# Main tabs - heavy libs loaded ONLY inside actions
-tab1,tab2=st.tabs(["✍️ Writer","📦 Export"])
+# Main workflow tabs - 6 stages
+tab1,tab2,tab3,tab4,tab5,tab6 = st.tabs(["✍️ 1.Writer","🔍 2.Checker","🎨 3.Designer","✨ 4.Finishing","📦 5.Exports","⬇️ 6.Downloads"])
+
 with tab1:
-    title=st.text_input("Book title")
-    prompt=st.text_area("Prompt / outline")
-    if st.button("Generate eBook",type="primary"):
+    st.markdown("### ✍️ Writer - Generate your eBook")
+    title=st.text_input("Book title", key="w_title")
+    prompt=st.text_area("Prompt / outline", key="w_prompt", height=150)
+    c1,c2 = st.columns(2)
+    if c1.button("Generate eBook",type="primary",use_container_width=True):
         if not title.strip() or not prompt.strip(): st.warning("Enter title and prompt"); st.stop()
-        # check limit (admin bypass)
         if not is_admin():
             u=cur_user()
             if not u: st.warning("Please Register/Login first"); st.stop()
@@ -146,38 +148,114 @@ with tab1:
         if not client: st.error("Add GROQ_API_KEY in Secrets"); st.stop()
         with st.spinner("Writing... (AI loading on demand)"):
             try:
-                r=client.chat.completions.create(model="llama-3.1-8b-instant",messages=[{"role":"user","content":f"Write chapter outline for '{title}': {prompt}"}],max_tokens=800)
+                r=client.chat.completions.create(model="llama-3.1-8b-instant",messages=[{"role":"user","content":f"Write full chapter content for book '{title}': {prompt}. Write clear, engaging, well-structured chapters."}],max_tokens=2000)
                 out=r.choices[0].message.content
                 st.session_state["last_book"]=out
-                st.success("Done!"); st.write(out)
+                st.session_state["book_title"]=title
+                st.success("Done! Go to Checker →"); st.write(out)
                 if not is_admin():
                     em=st.session_state["auth"]["email"]; st.session_state["users"][em]["usage"]["books"]+=1
             except Exception as e:
                 st.error(f"AI unavailable: {e}")
+    if c2.button("Clear",use_container_width=True):
+        st.session_state["last_book"]=""; st.rerun()
 
 with tab2:
+    st.markdown("### 🔍 Checker - Review & improve")
+    content = st.session_state.get("last_book","")
+    check_text = st.text_area("Content to check", value=content, height=250, key="check_input")
+    if st.button("Check Grammar & Clarity",use_container_width=True):
+        if not check_text.strip(): st.warning("No content to check - generate in Writer first"); st.stop()
+        client=get_groq()
+        if not client: st.error("Add GROQ_API_KEY"); st.stop()
+        with st.spinner("Checking..."):
+            try:
+                r=client.chat.completions.create(model="llama-3.1-8b-instant",messages=[{"role":"user","content":f"Check this book content for grammar, clarity, readability. List top 5 issues and give corrected version summary:\n\n{check_text[:4000]}"}],max_tokens=1500)
+                st.session_state["checked"]=r.choices[0].message.content
+                st.success("Check complete!")
+            except Exception as e: st.error(f"Check failed: {e}")
+    if "checked" in st.session_state and st.session_state["checked"]:
+        st.info("Checker report:"); st.write(st.session_state["checked"])
+        if st.button("Apply - Use checked version"):
+            st.session_state["last_book"]=st.session_state.get("check_input",""); st.success("Updated!")
+
+with tab3:
+    st.markdown("### 🎨 Designer - Cover & style")
+    btitle = st.text_input("Cover title", value=st.session_state.get("book_title",""), key="d_title")
+    style = st.selectbox("Cover style",["Modern Minimal","Classic Premium","Bold Colorful","Elegant Serif"])
+    if st.button("Generate Cover Concept",use_container_width=True):
+        client=get_groq()
+        if not client: st.warning("Add GROQ_API_KEY for AI concepts"); st.stop()
+        with st.spinner("Designing..."):
+            try:
+                r=client.chat.completions.create(model="llama-3.1-8b-instant",messages=[{"role":"user","content":f"Suggest 3 book cover design concepts for title '{btitle}' in style '{style}'. Include colors, fonts, layout."}],max_tokens=800)
+                st.session_state["cover_concept"]=r.choices[0].message.content
+            except Exception as e: st.error(f"{e}")
+    if st.session_state.get("cover_concept"):
+        st.write(st.session_state["cover_concept"])
+    st.caption("Upload your K logo will be placed on cover in final export.")
+
+with tab4:
+    st.markdown("### ✨ Finishing - Format & polish")
+    content = st.session_state.get("last_book","")
+    st.write(f"Current length: {len(content)} characters")
+    font_size = st.slider("Font size", 10, 16, 12)
+    line_sp = st.slider("Line spacing", 8, 20, 12)
+    add_toc = st.checkbox("Add Table of Contents page", value=True)
+    add_copyright = st.checkbox("Add Copyright page", value=True)
+    if st.button("Apply Finishing",use_container_width=True):
+        st.session_state["fmt"]={"font_size":font_size,"line_sp":line_sp,"toc":add_toc,"copyright":add_copyright}
+        st.success(f"Formatting saved: font {font_size}pt, spacing {line_sp}pt")
+
+with tab5:
+    st.markdown("### 📦 Exports - Build files")
     content=st.session_state.get("last_book","")
-    st.text_area("Preview",content,height=200)
-    c1,c2=st.columns(2)
-    if c1.button("Export PDF"):
-        if not content: st.warning("Generate first"); st.stop()
+    fmt=st.session_state.get("fmt",{"font_size":12,"line_sp":12,"toc":True,"copyright":True})
+    st.text_area("Preview",content,height=180,key="exp_preview")
+    e1,e2 = st.columns(2)
+    if e1.button("📄 Build PDF",use_container_width=True):
+        if not content: st.warning("Generate first in Writer"); st.stop()
         with st.spinner("Building PDF..."):
             try:
                 from fpdf import FPDF
-                pdf=FPDF(); pdf.add_page(); pdf.set_font("Arial",size=12)
-                for line in content.split("\n"): pdf.multi_cell(0,10,line)
-                pdf.output("/tmp/book.pdf")
-                with open("/tmp/book.pdf","rb") as f: st.download_button("Download PDF",f,"book.pdf")
+                pdf=FPDF(); pdf.add_page()
+                if fmt.get("copyright"): pdf.set_font("Arial",size=10); pdf.multi_cell(0,10,"Copyright (c) "+st.session_state.get("book_title","")); pdf.add_page()
+                if fmt.get("toc"): pdf.set_font("Arial",'B',size=14); pdf.cell(0,10,"Table of Contents",ln=True); pdf.add_page()
+                pdf.set_font("Arial",size=fmt["font_size"])
+                for line in content.split("\n"): pdf.multi_cell(0,fmt["line_sp"],line)
+                pdf.output("/tmp/book.pdf"); st.session_state["pdf_ready"]=True; st.success("PDF built! Go to Downloads →")
             except Exception as e: st.error(f"PDF failed: {e}")
-    if c2.button("Export DOCX"):
-        if not content: st.warning("Generate first"); st.stop()
+    if e2.button("📝 Build DOCX",use_container_width=True):
+        if not content: st.warning("Generate first in Writer"); st.stop()
         with st.spinner("Building DOCX..."):
             try:
                 from docx import Document
-                doc=Document(); doc.add_paragraph(content); doc.save("/tmp/book.docx")
-                with open("/tmp/book.docx","rb") as f: st.download_button("Download DOCX",f,"book.docx")
+                doc=Document()
+                if fmt.get("copyright"): doc.add_paragraph("Copyright (c) "+st.session_state.get("book_title",""))
+                if fmt.get("toc"): doc.add_heading("Table of Contents",1)
+                doc.add_paragraph(content); doc.save("/tmp/book.docx")
+                st.session_state["docx_ready"]=True; st.success("DOCX built! Go to Downloads →")
             except ImportError: st.error("Add python-docx to requirements.txt")
             except Exception as e: st.error(f"DOCX failed: {e}")
+
+with tab6:
+    st.markdown("### ⬇️ Downloads - Get your files")
+    content=st.session_state.get("last_book","")
+    if not content: st.info("No book yet. Start in 1.Writer")
+    else:
+        d1,d2 = st.columns(2)
+        with d1:
+            try:
+                with open("/tmp/book.pdf","rb") as f:
+                    st.download_button("⬇️ Download PDF",f,"book.pdf",mime="application/pdf",use_container_width=True)
+            except: st.caption("PDF not built yet - go to 5.Exports → Build PDF")
+        with d2:
+            try:
+                with open("/tmp/book.docx","rb") as f:
+                    st.download_button("⬇️ Download DOCX",f,"book.docx",use_container_width=True)
+            except: st.caption("DOCX not built yet - go to 5.Exports → Build DOCX")
+        st.markdown("---")
+        st.download_button("📋 Download as TXT",content,"book.txt",use_container_width=True)
 
 st.caption("⚡ Fast boot: heavy libraries load only when needed. If spinner hangs >2 min, reboot via Manage app → Reboot.")
 
