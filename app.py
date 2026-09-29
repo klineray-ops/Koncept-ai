@@ -69,7 +69,10 @@ with st.sidebar:
 
 # --- Publishing Add-ons ---
 import random, datetime, re
-from docx import Document
+try:
+    from docx import Document
+except ImportError:
+    Document = None
 
 def generate_ksbn():
     yr=datetime.datetime.now().year
@@ -218,6 +221,9 @@ with tab4:
             open("book.html","w",encoding="utf-8").write(html)
             with open("book.html","rb") as f: st.download_button("Download HTML",f,"book.html")
         elif fmt=="DOCX":
+            if Document is None:
+                st.error("python-docx not installed. Add python-docx to requirements.txt and reboot."); st.stop()
+            else:
             doc=Document(); doc.add_heading('eBook',0)
             doc.add_paragraph(f"ISBN: {isbn} | KSBN: {st.session_state['ksbn']}")
             for para in full_text.split("\\n"): doc.add_paragraph(para)
