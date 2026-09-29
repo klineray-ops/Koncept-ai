@@ -40,14 +40,29 @@ section[data-testid="stSidebar"] .stTextInput>div>div>input {color:#111111 !impo
 }
 </style>""", unsafe_allow_html=True)
 
-import base64
+import base64, glob
+def _find_image(name):
+    """Find an image file robustly: exact name, then case-insensitive search in repo."""
+    import os
+    if os.path.exists(name): return name
+    base = os.path.splitext(name)[0].lower()
+    for root, dirs, files in os.walk("."):
+        if ".git" in root: continue
+        for f in files:
+            if os.path.splitext(f)[0].lower() == base and f.lower().endswith((".png",".jpg",".jpeg",".webp")):
+                return os.path.join(root, f)
+    return None
+
 def _logo_html():
-    try:
-        with open("koncept_book_logo.png","rb") as f:
-            b64 = base64.b64encode(f.read()).decode()
-        return f"<img src='data:image/png;base64,{b64}' style='width:min(340px,80vw);height:auto;object-fit:contain;filter:drop-shadow(0 10px 30px rgba(139,92,246,0.45));'/>"
-    except:
-        return "<div style='font-size:64px'>📚</div>"
+    found = _find_image("koncept_book_logo.png")
+    if found:
+        try:
+            with open(found,"rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            return f"<img src='data:image/png;base64,{b64}' style='width:min(340px,80vw);height:auto;object-fit:contain;filter:drop-shadow(0 10px 30px rgba(139,92,246,0.45));'/>"
+        except Exception as e:
+            return f"<div style='color:#fbbf24'>⚠️ Logo found but could not load: {e}</div>"
+    return "<div style='color:#fbbf24;font-size:14px'>⚠️ koncept_book_logo.png not found in repo — upload it next to app.py, then Reboot.</div>"
 st.markdown(f"<div style='text-align:center;padding:1.5rem 1rem 0.5rem'>{_logo_html()}<p style='color:#cbd5e1;font-size:1.3rem;font-weight:600;margin-top:1rem;'>Concept, Write, Design, Publish, Earn<br/>Through BrOwn, KDP, Google, eBookSelf</p></div>", unsafe_allow_html=True)
 
 TIERS = {
@@ -169,10 +184,11 @@ def _kobot_log_to_sheet(entry):
 
 # Floating Kobot button
 _kobot_icon_b64 = ""
-try:
-    import base64 as _b64
-    with open("kobot_icon_cat.png","rb") as _f: _kobot_icon_b64 = _b64.b64encode(_f.read()).decode()
-except: pass
+_kobot_found = _find_image("kobot_icon_cat.png")
+if _kobot_found:
+    try:
+        with open(_kobot_found,"rb") as _f: _kobot_icon_b64 = base64.b64encode(_f.read()).decode()
+    except: pass
 if _kobot_icon_b64:
     st.markdown(f"""<style>
     #kobot-fab {{position:fixed;bottom:24px;right:24px;z-index:9999;cursor:pointer;}}
