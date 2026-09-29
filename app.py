@@ -32,9 +32,9 @@ section[data-testid="stSidebar"] {background:#1e293b !important;}
 section[data-testid="stSidebar"] * {color:#ffffff !important;}
 section[data-testid="stSidebar"] .stTextInput>div>div>input {color:#111111 !important;}
 .stCaption, small {color:#e2e8f0 !important;font-size:14px !important;}
-.brand-title {font-size:4.5rem !important;font-weight:900 !important;letter-spacing:-1px;margin:0;color:#ffffff !important;}
+.brand-title {font-size:18rem !important;font-weight:900 !important;letter-spacing:-1px;margin:0;color:#ffffff !important;line-height:0.9 !important;}
 @media (max-width: 768px) {
-  .brand-title {font-size:2.8rem !important;}
+  .brand-title {font-size:11.2rem !important;}
   button[data-baseweb="tab"] {font-size:12px !important;white-space:nowrap;padding:8px 4px !important;}
   .stButton>button {padding:.6rem 1rem !important;font-size:15px !important;}
 }
