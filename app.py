@@ -48,7 +48,7 @@ def _logo_html():
         return f"<img src='data:image/png;base64,{b64}' style='width:120px;height:120px;object-fit:contain;'/>"
     except:
         return "<div style='font-size:64px'>📚</div>"
-st.markdown(f"<div style='text-align:center;padding:1rem'><div style='font-size:4rem;font-weight:900;color:#fff;letter-spacing:2px;'>K</div>{_logo_html()}<div class='brand-title'>KONCEPT</div><div style='font-size:1.6rem;color:#fbbf24;font-weight:700;letter-spacing:6px;'>AI STUDIO</div><p style='color:#cbd5e1;font-size:1.1rem;'>Concept to Publish • KDP • eBookSelf</p></div>", unsafe_allow_html=True)
+st.markdown(f"<div style='text-align:center;padding:1rem'>{_logo_html()}<div class='brand-title'>KONCEPT</div><div style='font-size:4.5rem;color:#fbbf24;font-weight:800;letter-spacing:14px;margin-top:-1rem;'>AI STUDIO</div><p style='color:#cbd5e1;font-size:1.3rem;font-weight:600;margin-top:0.5rem;'>Concept, Write, Design, Publish, Earn<br/>Through BrOwn, KDP, Google, eBookSelf</p></div>", unsafe_allow_html=True)
 
 TIERS = {
     "Free": {"books":3,"chapters":9,"price":0,"price_label":"$0"},
