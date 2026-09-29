@@ -1,3 +1,17 @@
+import streamlit as st
+st.set_page_config(page_title="Koncept AI - Premium eBook Studio", page_icon="📚", layout="wide", initial_sidebar_state="expanded")
+
+# --- Premium UI ---
+PREMIUM_CSS = r'''.stApp { background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%); }
+.stButton>button { background: linear-gradient(90deg,#8b5cf6,#ec4899) !important; color:white !important; border:none !important; border-radius:12px !important; padding:0.7rem 1.8rem !important; font-weight:600 !important; box-shadow: 0 8px 24px #8b5cf644; }
+.stButton>button:hover { transform: translateY(-2px); }
+section[data-testid="stSidebar"] { background: rgba(15,23,42,0.9); }
+.card { background: rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:20px; padding:1.5rem; }
+'''
+st.markdown('<style>' + PREMIUM_CSS + '</style>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center;padding:2.5rem 1rem;margin-bottom:1.5rem;background:radial-gradient(circle at 50% 0%, #7c3aed55, transparent 70%);border-radius:24px;border:1px solid #ffffff18;"><h1 style="font-size:3rem;margin:0;background:linear-gradient(90deg,#fbbf24,#ec4899,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">📚 Koncept AI</h1><p style="color:#cbd5e1;max-width:700px;margin:1rem auto 0;font-size:1.1rem;">Turn ideas into publish-ready eBooks in minutes — write, design, optimize for Amazon KDP.</p></div>', unsafe_allow_html=True)
+
+# --- Original app logic ---
 
 # Standard sizes reference:
 # - Amazon KDP Paperback most popular: 6" x 9" (15.24 x 22.86 cm)
@@ -5,14 +19,13 @@
 # - 5.5" x 8.5" (13.97 x 21.59 cm)
 # - 8.5" x 11" (21.59 x 27.94 cm) - workbook
 # - A4 (8.27" x 11.69") - PDF guides
-import streamlit as st
 import os
 from groq import Groq
 from huggingface_hub import InferenceClient
 from fpdf import FPDF
 from PIL import Image
 
-st.set_page_config(page_title="Koncept AI - eBook Studio Pro", layout="wide")
+
 
 groq_client = Groq(api_key=st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY","")))
 hf_token = st.secrets.get("HF_TOKEN", os.getenv("HF_TOKEN",""))
