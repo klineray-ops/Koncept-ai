@@ -62,10 +62,10 @@ def _logo_html():
 st.markdown(f"<div style='text-align:center;padding:1.5rem 1rem 0.5rem'>{_logo_html()}<h1 style='margin:0.5rem 0;color:#ffffff !important;font-size:3rem;font-weight:800;'>Koncept AI</h1><p style='color:#ffffff !important;font-size:1.2rem;font-weight:500;'>Concept to Publish, KDP, BrOwn, eBookSelf...</p></div>", unsafe_allow_html=True)
 
 TIERS = {
-    "Free": {"books":1,"chapters":3,"price":0,"price_label":"$0"},
-    "Pro Std": {"books":10,"chapters":100,"price":9,"price_label":"$9/mo"},
-    "Pro Dlx": {"books":30,"chapters":500,"price":19,"price_label":"$19/mo"},
-    "Pro Max": {"books":100,"chapters":2000,"price":39,"price_label":"$39/mo"},
+    "Free": {"books":3,"chapters":9,"price":0,"price_label":"$0"},
+    "Pro Std": {"books":10,"chapters":100,"price":3.99,"price_label":"$3.99/mo"},
+    "Pro Dlx": {"books":30,"chapters":500,"price":5.99,"price_label":"$5.99/mo"},
+    "Pro Max": {"books":99,"chapters":2000,"price":9.99,"price_label":"$9.99/mo"},
 }
 
 if "users" not in st.session_state: st.session_state["users"]={}
@@ -128,6 +128,28 @@ with st.sidebar:
         st.progress(min(1.0,(cur_user()["usage"]["books"] if cur_user() and "usage" in cur_user() else 0)/cfg["books"]) if cur_user() else 0)
         sl=_safe_env("STRIPE_LINK") or "https://buy.stripe.com/your-link"
         st.link_button(f"Upgrade {cfg['price_label']}",sl)
+
+    st.markdown("---")
+    st.markdown("### 📘 Help")
+    if st.button("📖 User Manual", use_container_width=True):
+        st.session_state["show_manual"] = True
+    if st.session_state.get("show_manual"):
+        try:
+            with open("manual_poster.png","rb") as f:
+                st.image(f, use_column_width=True)
+        except: pass
+        st.markdown('''
+        **Quick Guide:**
+        1. ✍️ Writer - Generate your book
+        2. 🔍 Checker - Check grammar
+        3. 🎨 Designer - Cover ideas
+        4. ✨ Finishing - Format
+        5. 📦 Exports - Build PDF/DOCX
+        6. ⬇️ Downloads - Get files
+        ''')
+        if st.button("Close Manual"):
+            st.session_state["show_manual"] = False
+            st.rerun()
 
 # Main workflow tabs - 6 stages
 tab1,tab2,tab3,tab4,tab5,tab6 = st.tabs(["✍️ 1.Writer","🔍 2.Checker","🎨 3.Designer","✨ 4.Finishing","📦 5.Exports","⬇️ 6.Downloads"])
