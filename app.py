@@ -28,7 +28,29 @@ def get_sb():
 def _hash(pw): return hashlib.sha256(str(pw).encode()).hexdigest()
 
 # --- UI ---
-st.markdown("<style>.stApp{background:linear-gradient(180deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%)}.stButton>button{background:linear-gradient(90deg,#8b5cf6,#ec4899)!important;color:white!important;border:none!important;border-radius:12px!important;padding:.7rem 1.8rem!important;font-weight:600!important}</style>", unsafe_allow_html=True)
+st.markdown('''<style>
+.stApp{background:#0f172a !important;}
+.stApp p, .stApp div, .stApp label, .stApp span, .stMarkdown {color:#ffffff !important;font-size:16px !important;line-height:1.6 !important;}
+h1,h2,h3,h4 {color:#ffffff !important;font-weight:800 !important;}
+.stTextInput>div>div>input, .stTextArea>div>div>textarea {background:#ffffff !important;color:#111111 !important;font-size:16px !important;}
+.stTextInput input::placeholder, .stTextArea textarea::placeholder {color:#64748b !important;}
+.stButton>button{background:linear-gradient(90deg,#8b5cf6,#ec4899)!important;color:#ffffff!important;border:none!important;border-radius:12px!important;padding:.7rem 1.8rem!important;font-weight:700!important;font-size:16px!important;}
+.stButton>button:hover{filter:brightness(1.1);}
+/* Alerts - ensure readable dark text on light backgrounds */
+div[data-testid="stAlert"] {font-size:15px !important;}
+div[data-testid="stAlert"] * {color:#111111 !important;}
+/* Tabs */
+button[data-baseweb="tab"] {color:#ffffff !important;font-size:16px !important;font-weight:600 !important;}
+button[data-baseweb="tab"][aria-selected="true"] {color:#fbbf24 !important;border-bottom-color:#fbbf24 !important;}
+/* Sidebar */
+section[data-testid="stSidebar"] {background:#1e293b !important;}
+section[data-testid="stSidebar"] * {color:#ffffff !important;}
+section[data-testid="stSidebar"] .stTextInput>div>div>input {color:#111111 !important;}
+/* Captions and small text */
+.stCaption, small {color:#e2e8f0 !important;font-size:14px !important;}
+/* Radio and checkbox labels */
+div[data-testid="stRadio"] label, div[data-testid="stCheckbox"] label {color:#ffffff !important;}
+</style>''', unsafe_allow_html=True)
 import base64
 def _logo_html():
     try:
@@ -37,7 +59,7 @@ def _logo_html():
         return f"<img src='data:image/png;base64,{b64}' style='width:110px;height:110px;object-fit:contain;filter:drop-shadow(0 8px 24px rgba(139,92,246,0.5));'/>"
     except:
         return "<div style='font-size:64px'>📚</div>"
-st.markdown(f"<div style='text-align:center;padding:1.5rem 1rem 0.5rem'>{_logo_html()}<h1 style='margin:0.5rem 0;background:linear-gradient(90deg,#8b5cf6,#ec4899,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:3rem;font-weight:800;'>Koncept AI</h1><p style='color:#cbd5e1;font-size:1.1rem;'>Concept to Publish, KDP, BrOwn, eBookSelf...</p></div>", unsafe_allow_html=True)
+st.markdown(f"<div style='text-align:center;padding:1.5rem 1rem 0.5rem'>{_logo_html()}<h1 style='margin:0.5rem 0;color:#ffffff !important;font-size:3rem;font-weight:800;'>Koncept AI</h1><p style='color:#ffffff !important;font-size:1.2rem;font-weight:500;'>Concept to Publish, KDP, BrOwn, eBookSelf...</p></div>", unsafe_allow_html=True)
 
 TIERS = {
     "Free": {"books":1,"chapters":3,"price":0,"price_label":"$0"},
