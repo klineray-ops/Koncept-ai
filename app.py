@@ -293,7 +293,7 @@ if st.session_state.get("kobot_open"):
                         else:
                             ql = q.lower()
                             if "price" in ql or "plan" in ql: ans="Plans: Free (1 book $0), Pro Std (10 books $9/mo), Pro Dlx (30 books $19/mo), Pro Max (100 books $39/mo)."
-                            elif "pdf" in ql: ans="Go to the Export tab, then click Export PDF and download."
+                            elif "pdf" in ql: ans="Go to the Download/Export tab, then click Export PDF and download."
                             elif "support" in ql or "help" in ql: ans=f"Email us at {SUPPORT_EMAIL} and we will help you."
                             else: ans="Thanks! Ask me about plans, the writer, or exports — or email support for anything else."
                         st.session_state["kobot_hist"].append({"r":"bot","t":ans})
@@ -310,7 +310,29 @@ if st.session_state.get("kobot_open"):
         _reraise_if_st_control(e)
         st.error(f"Kobot panel error: {e}")
 
-tab1, tab2 = st.tabs(["\u270d\ufe0f Writer","\U0001F4E6 Export"])
+if "fmt" not in st.session_state:
+    st.session_state["fmt"] = {"size": 12, "spacing": "1.15", "heading": "Keep as-is", "align": "Left", "pagenum": True}
+
+def _is_heading(_ln):
+    import re as _re
+    _s = (_ln or "").strip()
+    if not _s: return False
+    _l = _s.lower()
+    if _l.startswith("chapter") or _s.startswith("#"): return True
+    if _re.match(r"^\d+[\.\)]\s+\S", _s): return True
+    return len(_s) < 70 and _s == _s.upper() and any(_c.isalpha() for _c in _s)
+
+def _apply_heading_style(_tx, _style):
+    if _style == "Keep as-is" or not _tx: return _tx
+    _out = []
+    for _ln in _tx.split("\n"):
+        if _is_heading(_ln):
+            _out.append(_ln.upper() if _style == "UPPERCASE" else _ln.title())
+        else:
+            _out.append(_ln)
+    return "\n".join(_out)
+
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["\u270d\ufe0f Write","\U0001F3A8 Design","\U0001F50D Check","\U0001F58B\uFE0F Format","\U0001F441\uFE0F View/Correct","\U0001F4E6 Download/Export"])
 with tab1:
     title = st.text_input("Book title", key="bk_title").strip()
     prompt = st.text_area("Prompt / outline", key="bk_prompt").strip()
@@ -352,7 +374,7 @@ with tab1:
                 if not out:
                     st.error(f"Book generation failed after 2 attempts ({_err}). Check your connection and GROQ_API_KEY, then try again."); st.stop()
             st.session_state["last_book"] = out
-            st.success("Done! Your outline is ready below and in the Export tab.")
+            st.success("Done! Your outline is Done! Your book draft is ready. Continue: Design \u2192 Check \u2192 Format \u2192 View/Correct \u2192 Download/Export.")
             st.write(out)
             if not is_admin():
                 try:
@@ -364,7 +386,208 @@ with tab1:
             _reraise_if_st_control(e)
             st.error(f"Something went wrong: {e}")
 
+
 with tab2:
+    st.markdown("### \U0001F3A8 Book Cover Designer")
+    try:
+        _bt = st.session_state.get("bk_title", "")
+        ct = st.text_input("Cover title", value=_bt if isinstance(_bt, str) else "", key="cv_title").strip()
+        cs = st.text_input("Subtitle (optional)", key="cv_sub").strip()
+        ca = st.text_input("Author name", key="cv_author").strip()
+        th = st.selectbox("Theme", ["Royal Purple", "Ocean Blue", "Sunset", "Forest", "Midnight", "Crimson Gold"], key="cv_theme")
+        if st.button("\U0001F3A8 Create Cover", type="primary", key="cv_go"):
+            if not ct:
+                st.warning("Enter a cover title first."); st.stop()
+            try:
+                from PIL import Image, ImageDraw, ImageFont
+                import io as _io
+                W, H = 1600, 2560
+                _themes = {"Royal Purple": ((76, 29, 149), (139, 92, 246)), "Ocean Blue": ((12, 74, 110), (56, 189, 248)),
+                           "Sunset": ((124, 45, 18), (251, 146, 60)), "Forest": ((20, 83, 45), (74, 222, 128)),
+                           "Midnight": ((15, 23, 42), (100, 116, 139)), "Crimson Gold": ((127, 29, 29), (251, 191, 36))}
+                c1, c2 = _themes.get(th, _themes["Royal Purple"])
+                img = Image.new("RGB", (W, H), c1)
+                dr = ImageDraw.Draw(img, "RGBA")
+                for _y in range(H):
+                    _r = int(c1[0] + (c2[0] - c1[0]) * _y / H)
+                    _g = int(c1[1] + (c2[1] - c1[1]) * _y / H)
+                    _b = int(c1[2] + (c2[2] - c1[2]) * _y / H)
+                    dr.line([(0, _y), (W, _y)], fill=(_r, _g, _b))
+                dr.rectangle([80, 80, W - 80, H - 80], outline=(255, 255, 255, 170), width=6)
+                dr.rectangle([112, 112, W - 112, H - 112], outline=(255, 255, 255, 80), width=3)
+                def _font(sz):
+                    try: return ImageFont.load_default(size=sz)
+                    except Exception: return ImageFont.load_default()
+                def _wrap(_tx, _f, _mw):
+                    _ws = _tx.split(); _ls = []; _cu = ""
+                    for _w in _ws:
+                        _t2 = (_cu + " " + _w).strip()
+                        if dr.textlength(_t2, font=_f) <= _mw: _cu = _t2
+                        else: _ls.append(_cu); _cu = _w
+                    if _cu: _ls.append(_cu)
+                    return _ls
+                _fT = _font(130); _fS = _font(62); _fA = _font(74); _fB = _font(42)
+                _y0 = int(H * 0.30)
+                for _ln in _wrap(ct, _fT, W - 360):
+                    dr.text((W // 2, _y0), _ln, font=_fT, fill=(255, 255, 255), anchor="mm", stroke_width=2, stroke_fill=(0, 0, 0, 110))
+                    _y0 += 150
+                if cs:
+                    _y0 += 30
+                    for _ln in _wrap(cs, _fS, W - 360):
+                        dr.text((W // 2, _y0), _ln, font=_fS, fill=(255, 255, 255, 230), anchor="mm")
+                        _y0 += 80
+                if ca:
+                    dr.text((W // 2, int(H * 0.78)), ca, font=_fA, fill=(255, 255, 255), anchor="mm", stroke_width=1, stroke_fill=(0, 0, 0, 110))
+                dr.text((W // 2, H - 180), "KONCEPT AI STUDIO", font=_fB, fill=(255, 255, 255, 200), anchor="mm")
+                _buf = _io.BytesIO(); img.save(_buf, "PNG")
+                st.session_state["cover_png"] = _buf.getvalue()
+                st.success("Cover created! It will appear as the first page of your PDF.")
+            except Exception as e:
+                st.error(f"Cover failed: {e}")
+        if st.session_state.get("cover_png"):
+            st.image(st.session_state["cover_png"], caption="Your book cover", width=300)
+            st.download_button("Download Cover (PNG)", st.session_state["cover_png"], "koncept_cover.png", mime="image/png", key="dl_cover")
+    except Exception as e:
+        _reraise_if_st_control(e)
+        st.error(f"Design panel error: {e}")
+
+with tab3:
+    st.markdown("### \U0001F50D Check \u2014 plagiarism, spelling, grammar & copyright")
+    try:
+        import re as _re
+        _cb = st.session_state.get("last_book", "") or ""
+        if not _cb.strip():
+            st.info("Generate a book in the Write tab first, then run checks here.")
+        else:
+            if st.button("\U0001F50D Run Local Checks", key="chk_local", type="primary"):
+                with st.spinner("Scanning your draft..."):
+                    _words = _re.findall(r"[A-Za-z']+", _cb.lower())
+                    _mis = {"recieve":"receive","seperate":"separate","occured":"occurred","definately":"definitely",
+                            "neccessary":"necessary","accomodate":"accommodate","wich":"which","teh":"the","adn":"and",
+                            "thier":"their","beleive":"believe","alot":"a lot","untill":"until","goverment":"government",
+                            "harrass":"harass","independant":"independent","knowlege":"knowledge","milennium":"millennium",
+                            "noticable":"noticeable","occurence":"occurrence","persistant":"persistent","publically":"publicly",
+                            "recomend":"recommend","rythm":"rhythm","suprise":"surprise","tatoo":"tattoo","tendancy":"tendency",
+                            "truely":"truly","wether":"whether","wierd":"weird","existant":"existent","liason":"liaison"}
+                    _found = {}
+                    for _w in _words:
+                        if _w in _mis: _found[_w] = _mis[_w]
+                    _sents = [_s.strip() for _s in _re.split(r"(?<=[.!?])\s+", _cb) if len(_s.strip()) > 40]
+                    _cnt = {}
+                    for _s in _sents: _k = _s.lower(); _cnt[_k] = _cnt.get(_k, 0) + 1
+                    _dups = [_k for _k, _v in _cnt.items() if _v > 1]
+                    _repw = _re.findall(r"\b(\w+)\s+\1\b", _cb, flags=_re.I)
+                    _dbl = _cb.count("  ")
+                    _nospc = _re.findall(r"[a-z][,.!?][A-Z]", _cb)
+                st.markdown("**Local check results**")
+                _ex = (" \u2014 e.g. " + ", ".join([f"{_k} \u2192 {_v}" for _k, _v in list(_found.items())[:6]])) if _found else ""
+                st.write(f"\u2022 Possible misspellings: **{len(_found)}**{_ex}")
+                st.write(f"\u2022 Repeated sentences (self-duplication): **{len(_dups)}**")
+                if _dups:
+                    with st.expander("Show repeated sentences"):
+                        for _d in _dups[:8]: st.write("\u2014 " + _d[:140] + ("..." if len(_d) > 140 else ""))
+                st.write(f"\u2022 Repeated words (e.g. \u2018the the\u2019): **{len(_repw)}**")
+                st.write(f"\u2022 Double spaces: **{_dbl}**")
+                st.write(f"\u2022 Missing space after punctuation: **{len(_nospc)}**")
+                st.caption("Local checks catch issues inside your draft. For web-wide plagiarism scanning, paste suspicious passages into a search engine or a dedicated plagiarism service before publishing.")
+            if st.button("\u2728 AI Deep Check (grammar + copyright risk)", key="chk_ai"):
+                _cli = get_groq()
+                if not _cli:
+                    st.error("Add GROQ_API_KEY in Secrets to use the AI check."); st.stop()
+                with st.spinner("AI is reviewing your book (grammar + copyright risks)..."):
+                    try:
+                        _r = _cli.chat.completions.create(model="llama-3.3-70b-versatile",
+                            messages=[{"role": "system", "content": "You are a meticulous editor and publishing risk reviewer."},
+                                      {"role": "user", "content": "Review this book draft. 1) List grammar/spelling problems with corrections. 2) Flag COPYRIGHT RISKS: long quoted passages, song lyrics, recognisable copyrighted text, brand/trademark misuse. Be specific. Text:\n\n" + _cb[:12000]}],
+                            max_tokens=3000, temperature=0.2)
+                        _out = (_r.choices[0].message.content or "").strip()
+                        if _out:
+                            st.markdown("**AI review**"); st.write(_out)
+                        else:
+                            st.warning("AI returned empty text. Try again.")
+                    except Exception as e:
+                        st.error(f"AI check failed: {e}")
+            with st.expander("\u00a9 Copyright safety checklist"):
+                st.write("\u2022 Write in your own words; never paste text from websites or books.")
+                st.write("\u2022 Song lyrics: never include them, even short lines \u2014 they are strictly enforced.")
+                st.write("\u2022 Quotes: keep them short and always attribute the author.")
+                st.write("\u2022 Avoid brand names in titles or implying endorsement.")
+                st.write("\u2022 AI-assisted text is yours to publish, but you are responsible for its originality.")
+                st.write("\u2022 When in doubt, rewrite the passage fully in your own voice.")
+    except Exception as e:
+        _reraise_if_st_control(e)
+        st.error(f"Check panel error: {e}")
+
+
+with tab4:
+    st.markdown("### \U0001F58B\uFE0F Format \u2014 set your book style")
+    try:
+        import html as _html
+        _f = st.session_state.get("fmt", {})
+        _sz_opts = [10, 11, 12, 14]
+        _sz = st.selectbox("Body font size", _sz_opts, index=_sz_opts.index(_f.get("size", 12)) if _f.get("size", 12) in _sz_opts else 2, key="fmt_size")
+        _sp_opts = ["Single", "1.15", "1.5", "Double"]
+        _sp = st.selectbox("Line spacing", _sp_opts, index=_sp_opts.index(_f.get("spacing", "1.15")) if _f.get("spacing", "1.15") in _sp_opts else 1, key="fmt_sp")
+        _hd_opts = ["Keep as-is", "UPPERCASE", "Title Case"]
+        _hdv = _f.get("heading", "Keep as-is")
+        _hd = st.selectbox("Chapter heading style", _hd_opts, index=_hd_opts.index(_hdv) if _hdv in _hd_opts else 0, key="fmt_hd")
+        _al_opts = ["Left", "Justify"]
+        _alv = _f.get("align", "Left")
+        _al = st.selectbox("Text alignment (PDF)", _al_opts, index=_al_opts.index(_alv) if _alv in _al_opts else 0, key="fmt_al")
+        _pn = st.checkbox("Page numbers in PDF", value=bool(_f.get("pagenum", True)), key="fmt_pn")
+        st.session_state["fmt"] = {"size": _sz, "spacing": _sp, "heading": _hd, "align": _al, "pagenum": _pn}
+        st.caption("Format is saved automatically and applied when you export.")
+        st.markdown("**Live preview**")
+        _fb = st.session_state.get("last_book", "") or ""
+        _pv_src = _fb[:700] if _fb.strip() else "Write a book first \u2014 your formatted preview will appear here."
+        _pv = _html.escape(_apply_heading_style(_pv_src, _hd)).replace("\n", "<br>")
+        _lh = {"Single": "1.4", "1.15": "1.6", "1.5": "2.0", "Double": "2.6"}[_sp]
+        st.markdown(f"<div style='background:#ffffff;color:#111111;padding:1rem;border-radius:8px;font-size:{_sz}px;line-height:{_lh};'>{_pv}</div>", unsafe_allow_html=True)
+    except Exception as e:
+        _reraise_if_st_control(e)
+        st.error(f"Format panel error: {e}")
+
+
+with tab5:
+    st.markdown("### \U0001F441\uFE0F View / Correct")
+    try:
+        _fb = st.session_state.get("last_book", "") or ""
+        if not _fb.strip():
+            st.info("Generate a book in the Writer tab first, then polish it here.")
+        else:
+            _words = len(_fb.split())
+            _chaps = sum(1 for _ln in _fb.split("\n") if _ln.strip().lower().startswith(("chapter", "#")))
+            st.write(f"**{_words:,}** words | **{_chaps}** headings | **{len(_fb):,}** characters")
+            _ed = st.text_area("Edit your book (press Save Edits to apply)", value=_fb, height=350, key="finish_editor")
+            _fc1, _fc2 = st.columns(2)
+            if _fc1.button("\U0001F4BE Save Edits", key="fin_save"):
+                st.session_state["last_book"] = _ed
+                st.success("Edits saved! Download from the Download/Export tab.")
+            if _fc2.button("\u2728 Polish with AI", key="fin_polish"):
+                _cli = get_groq()
+                if not _cli:
+                    st.error("Add GROQ_API_KEY in Secrets to use AI polish."); st.stop()
+                with st.spinner("Polishing your book..."):
+                    try:
+                        _r = _cli.chat.completions.create(model="llama-3.3-70b-versatile",
+                            messages=[{"role": "system", "content": "You are a professional editor. Proofread the text: fix grammar, spelling and flow. Keep every chapter heading and the structure exactly. Return only the polished text."},
+                                      {"role": "user", "content": _ed[:12000]}],
+                            max_tokens=3500, temperature=0.3)
+                        _pol = (_r.choices[0].message.content or "").strip()
+                        if _pol:
+                            st.session_state["last_book"] = _pol
+                            st.success("Polished! Review it above, then download.")
+                            st.rerun()
+                        else:
+                            st.warning("AI returned empty text. Try again.")
+                    except Exception as e:
+                        st.error(f"Polish failed: {e}")
+    except Exception as e:
+        _reraise_if_st_control(e)
+        st.error(f"View panel error: {e}")
+
+with tab6:
+    st.markdown("### \U0001F4E6 Download / Export")
     try:
         content = st.session_state.get("last_book","") or ""
         st.text_area("Preview", content, height=200, key="preview_area")
@@ -375,10 +598,32 @@ with tab2:
                 try:
                     from fpdf import FPDF
                     safe = _sanitize_pdf_text(content)
-                    pdf = FPDF(); pdf.set_auto_page_break(auto=True, margin=20)
-                    pdf.add_page(); pdf.set_font("Arial", size=12)
+                    _f = st.session_state.get("fmt", {})
+                    _fsz = int(_f.get("size", 12))
+                    _mult = {"Single": 1.0, "1.15": 1.15, "1.5": 1.5, "Double": 2.0}.get(_f.get("spacing", "1.15"), 1.15)
+                    _lh = max(6, int(8 * _mult))
+                    _al = "J" if _f.get("align") == "Justify" else "L"
+                    _pgn = bool(_f.get("pagenum", True))
+                    class _PDF(FPDF):
+                        def footer(_s):
+                            if _pgn and _s.page_no() > 1:
+                                _s.set_y(-15); _s.set_font("Arial", size=9)
+                                _s.cell(0, 10, f"Page {_s.page_no() - 1}", align="C")
+                    safe = _apply_heading_style(_sanitize_pdf_text(content), _f.get("heading", "Keep as-is"))
+                    pdf = _PDF(); pdf.set_auto_page_break(auto=True, margin=20)
+                    if st.session_state.get("cover_png"):
+                        try:
+                            open("/tmp/cover.png", "wb").write(st.session_state["cover_png"])
+                            pdf.add_page(); pdf.image("/tmp/cover.png", x=0, y=0, w=210, h=297)
+                        except Exception: pass
+                    pdf.add_page()
                     for line in safe.split("\n"):
-                        pdf.multi_cell(0, 10, line if line.strip() else " ")
+                        _tx = line if line.strip() else " "
+                        if _is_heading(line):
+                            pdf.set_font("Arial", "B", _fsz + 2)
+                        else:
+                            pdf.set_font("Arial", "", _fsz)
+                        pdf.multi_cell(0, _lh, _tx, align=_al)
                     data = pdf.output(dest="S")
                     pdf_bytes = bytes(data) if isinstance(data, bytearray) else data.encode("latin-1")
                     st.download_button("Download PDF", pdf_bytes, "koncept_book.pdf", mime="application/pdf", key="dl_pdf")
@@ -390,10 +635,22 @@ with tab2:
             with st.spinner("Building DOCX..."):
                 try:
                     from docx import Document
+                    from docx.shared import Pt
                     doc = Document()
-                    for para in content.split("\n"):
+                    _f = st.session_state.get("fmt", {})
+                    _fsz = int(_f.get("size", 12))
+                    try: doc.styles["Normal"].font.size = Pt(_fsz)
+                    except Exception: pass
+                    for para in _apply_heading_style(content, _f.get("heading", "Keep as-is")).split("\n"):
                         para = para.strip()
-                        if para: doc.add_paragraph(para)
+                        if not para: continue
+                        if _is_heading(para):
+                            _hp = doc.add_heading(para, level=1)
+                            for _rn in _hp.runs:
+                                try: _rn.font.size = Pt(_fsz + 4)
+                                except Exception: pass
+                        else:
+                            doc.add_paragraph(para)
                     import io as _io
                     buf = _io.BytesIO(); doc.save(buf); buf.seek(0)
                     st.download_button("Download DOCX", buf.getvalue(), "koncept_book.docx",
@@ -403,9 +660,11 @@ with tab2:
                     st.error("Add 'python-docx' to requirements.txt and Reboot.")
                 except Exception as e:
                     st.error(f"DOCX failed: {e}")
+        if content.strip():
+            st.download_button("Download TXT", content.encode("utf-8"), "koncept_book.txt", mime="text/plain", key="dl_txt")
     except Exception as e:
         _reraise_if_st_control(e)
-        st.error(f"Export panel error: {e}")
+        st.error(f"Download panel error: {e}")
 
 st.caption("\u26a1 Koncept AI Studio — Concept, Write, Design, Publish, Earn.")
 
